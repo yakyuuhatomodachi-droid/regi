@@ -97,11 +97,15 @@ td.r,th.r{text-align:right}
 #sumBox .big{font-size:40px;font-weight:800;color:var(--g);text-align:center;margin:4px 0 12px}
 #sumHead{text-align:center}
 .cl{padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer}
-.cl .det{display:none;margin-top:8px}
-.cl.open .det{display:block}
+.cl:active{background:var(--gl)}
 #recent{max-height:320px;overflow:auto}
 #recent .tx:first-child.fresh{background:var(--gl);border-radius:8px;padding-left:8px;padding-right:8px}
-#runTotal{background:var(--gl);color:var(--g);border-radius:10px;padding:8px 12px;font-size:14px;margin-bottom:10px;display:flex;justify-content:space-between}
+#marketCard{margin-bottom:12px}
+.mrow{display:flex;gap:10px;align-items:stretch;margin-top:6px;flex-wrap:wrap}
+.mrow input{flex:1 1 240px;font-size:17px;font-weight:700}
+#runTotal{flex:0 0 auto;background:var(--gl);color:var(--g);border-radius:10px;padding:8px 14px;font-size:14px;display:flex;gap:12px;align-items:center;justify-content:space-between}
+#runTotal b{font-size:18px}
+@media (max-width:520px){ #runTotal{flex:1 1 100%} }
 #login{position:fixed;inset:0;background:var(--bg);z-index:40;display:none;align-items:center;justify-content:center;padding:16px}
 #login.on{display:flex}
 #login .card{max-width:360px;width:100%}
@@ -123,6 +127,13 @@ td.r,th.r{text-align:right}
 <main>
   <!-- 会計 -->
   <section id="p-kaikei" class="pane on">
+    <div class="card" id="marketCard">
+      <label for="marketName" class="mu">今回のマルシェ</label>
+      <div class="mrow">
+        <input id="marketName" placeholder="マルシェの名前を入れる（例：あさぎり朝市）" autocomplete="off">
+        <div id="runTotal"><span>今回の売上</span><b id="runYen">0円（0人）</b></div>
+      </div>
+    </div>
     <div id="kaikei">
       <div class="card">
         <h2>売れた品物を押す <span class="mu">（2個なら2回）</span></h2>
@@ -130,7 +141,6 @@ td.r,th.r{text-align:right}
       </div>
       <div class="rcol">
       <div class="card" id="cartCard">
-        <div id="runTotal"><span>今回のマルシェの売上</span><b id="runYen">0円（0人）</b></div>
         <h2>お会計</h2>
         <ul id="cart"></ul>
         <div class="sum"><span>合計</span><span class="big" id="total">0円</span></div>
@@ -200,12 +210,12 @@ td.r,th.r{text-align:right}
     </div>
     <div class="card shime">
       <h2>売上の締め</h2>
-      <p class="mu" style="margin:0 0 10px">マルシェが終わったら締めます。集計がスプレッドシートの「締め」シートに記録され、レジの売上は0にもどります。</p>
-      <input id="closeName" placeholder="マルシェの名前（例：あさぎり朝市）※なくてもOK" style="margin-bottom:10px">
+      <p class="mu" style="margin:0 0 10px">マルシェが終わったら締めます。集計がスプレッドシートの「締め」シートに記録されて下の履歴に並び、レジの売上は0にもどります。</p>
+      <p style="margin:0 0 10px">締めるマルシェ：<b id="closeTarget"></b><br><span class="mu">名前は会計画面の上で入れられます（締めたあとでも直せます）</span></p>
       <button class="btn" id="closeBtn" style="width:100%">売上を締める</button>
     </div>
     <div class="card">
-      <h2>これまでの締め <span class="mu">（新しい順）</span></h2>
+      <h2>締めた売上の履歴 <span class="mu">（新しい順・押すと詳しく見られます）</span></h2>
       <div id="closes"></div>
     </div>
   </section>
@@ -220,6 +230,10 @@ td.r,th.r{text-align:right}
 
 <div id="sumBox"><div class="card">
   <div class="mu" id="sumHead"></div>
+  <div class="row" style="margin:10px 0 4px">
+    <input id="sumName" placeholder="マルシェの名前">
+    <button class="btn sub" id="sumNameSave" style="flex:none">名前を保存</button>
+  </div>
   <div class="big" id="sumTotal"></div>
   <div class="stats" style="margin-bottom:12px">
     <div class="stat"><span class="mu">お客さん</span><b id="sumCount"></b></div>
@@ -227,6 +241,8 @@ td.r,th.r{text-align:right}
     <div class="stat"><span class="mu">取消</span><b id="sumCx"></b></div>
   </div>
   <table><thead><tr><th>品物</th><th class="r">数</th><th class="r">金額</th></tr></thead><tbody id="sumItems"></tbody></table>
+  <h2 style="margin-top:16px">会計の記録</h2>
+  <div id="sumTxs" style="max-height:240px;overflow:auto"></div>
   <div class="row" style="margin-top:14px">
     <button class="btn sub" id="sumCsv" style="flex:1">ファイルに保存</button>
     <button class="btn" id="sumOk" style="flex:1">閉じる</button>
@@ -248,7 +264,7 @@ td.r,th.r{text-align:right}
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbz3YayhvzJ6REioKQerUPXrVbpi9KgeYQlYpp5uVwZERbTvIzqoec4a43S0MGbW8yWwGQ/exec';
 
 const COLORS = ['#2E6B4E','#7CB342','#E53935','#FB8C00','#FDD835','#8E24AA','#1E88E5','#6D4C41'];
-const LS = { key:'aquaRegi.key', items:'aquaRegi.items', queue:'aquaRegi.queue', open:'aquaRegi.open' };
+const LS = { key:'aquaRegi.key', items:'aquaRegi.items', queue:'aquaRegi.queue', open:'aquaRegi.open', market:'aquaRegi.market' };
 const $ = id => document.getElementById(id);
 const yen = n => Number(n).toLocaleString('ja-JP') + '円';
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -430,11 +446,11 @@ function buildOpen(){
   openData = serverOpen.concat(queue.filter(t => !ids.has(t.id)).map(t => Object.assign({ pending: true }, t)))
     .sort((a,b) => (b.date + b.time + b.id).localeCompare(a.date + a.time + a.id));
 }
-function renderTxList(box, list){
+function renderTxList(box, list, readonly){
   box.innerHTML = list.length ? list.map(t =>
     `<div class="tx ${t.canceled?'cx':''}"><div class="row"><b style="flex:1">${esc(t.time)}　<span class="amt">${yen(t.total)}</span>
       ${t.pending?'<span class="tag">未送信</span>':''}${t.canceled?'<span class="tag gray">取消</span>':''}</b>
-      ${!t.canceled?`<button class="ib" data-id="${esc(t.id)}" style="color:var(--red)">取り消す</button>`:''}</div>
+      ${!t.canceled && !readonly?`<button class="ib" data-id="${esc(t.id)}" style="color:var(--red)">取り消す</button>`:''}</div>
       <div class="mu">${t.lines.map(l => esc(l.name) + '×' + l.qty).join('、')}${t.paid!=null?'　あずかり'+yen(t.paid)+'・おつり'+yen(t.change):''}</div></div>`).join('')
     : '<div class="empty">まだ記録した会計はありません</div>';
   box.querySelectorAll('button[data-id]').forEach(b => b.onclick = () => cancelTx(b.dataset.id));
@@ -455,7 +471,9 @@ function renderOpen(){
 async function loadOpen(){
   renderOpen();
   try{
-    serverOpen = (await api('getOpen')).txs; lsSet(LS.open, serverOpen);
+    const j = await api('getOpen');
+    serverOpen = j.txs; lsSet(LS.open, serverOpen);
+    if (typeof j.market === 'string' && document.activeElement !== $('marketName') && !marketTimer) { marketName = j.market; lsSet(LS.market, marketName); renderMarket(); }
     $('pending').textContent = '';
   }catch(e){
     if (e.code === 'auth') { showLogin(); return; }
@@ -475,8 +493,21 @@ async function cancelTx(id){
   catch(e){ toast(e.code === 'closed' ? '締めたあとの取引は取り消せません' : '電波がないため取り消せませんでした'); }
 }
 
+// ---------- マルシェの名前 ----------
+let marketName = lsGet(LS.market, '');
+function renderMarket(){
+  if (document.activeElement !== $('marketName')) $('marketName').value = marketName;
+  $('closeTarget').textContent = marketName ? '「' + marketName + '」' : '（名前なし）';
+}
+let marketTimer = null;
+$('marketName').oninput = () => {
+  marketName = $('marketName').value.trim(); lsSet(LS.market, marketName); renderMarket();
+  clearTimeout(marketTimer);
+  marketTimer = setTimeout(() => { marketTimer = null; api('setMarket', { name: marketName }).catch(() => {}); }, 800);
+};
+$('marketName').onchange = () => { clearTimeout(marketTimer); marketTimer = null; api('setMarket', { name: marketName }).catch(() => {}); };
+
 // ---------- 締め ----------
-let lastSummary = null, lastTxs = [];
 $('closeBtn').onclick = async () => {
   if (!navigator.onLine){ toast('電波のある所で締めてください'); return; }
   await flush();
@@ -484,15 +515,16 @@ $('closeBtn').onclick = async () => {
   buildOpen();
   if (!openData.length){ toast('締める売上がありません'); return; }
   const s = aggregate(openData);
-  if (!confirm('売上を締めますか？\n\n売上 ' + yen(s.total) + '（' + s.count + '人）\n\n集計を記録して、レジの売上を0にもどします。')) return;
+  if (!confirm('売上を締めますか？\n\n' + (marketName || '（名前なし）') + '\n売上 ' + yen(s.total) + '（' + s.count + '人）\n\n集計を記録して、レジの売上を0にもどします。')) return;
   $('closeBtn').disabled = true;
   try{
-    lastTxs = openData.slice();
-    const j = await api('closeSession', { name: $('closeName').value.trim() });
-    lastSummary = j.summary;
+    const txs = openData.slice();
+    const j = await api('closeSession', { name: marketName });
     serverOpen = []; lsSet(LS.open, serverOpen);
-    $('closeName').value = '';
-    renderOpen(); showSummary(lastSummary); loadCloses();
+    marketName = ''; lsSet(LS.market, ''); renderMarket();
+    renderOpen(); loadCloses();
+    const c = j.summary;
+    showDetail({ id: c.id, date: c.date, start: c.start, end: c.end, name: c.name }, txs, '締めました');
   }catch(e){
     if (e.code === 'auth') showLogin();
     else if (e.code === 'empty') { toast('締める売上がありません'); loadOpen(); }
@@ -500,39 +532,66 @@ $('closeBtn').onclick = async () => {
   }
   $('closeBtn').disabled = false;
 };
-function showSummary(s){
-  $('sumHead').textContent = '締めました　' + s.date + '　' + s.start + '〜' + s.end + (s.name ? '　' + s.name : '');
+
+// ---------- 締めた売上の詳しい画面 ----------
+let detail = null;   // { close, txs }
+function showDetail(close, txs, label){
+  detail = { close, txs };
+  const s = aggregate(txs);
+  $('sumHead').textContent = (label ? label + '　' : '') + close.date + '　' + close.start + '〜' + close.end;
+  $('sumName').value = close.name || '';
   $('sumTotal').textContent = yen(s.total);
   $('sumCount').textContent = s.count + '人';
   $('sumQty').textContent = s.qty + '個';
   $('sumCx').textContent = s.canceled + '件';
   $('sumItems').innerHTML = itemRows(s.items);
+  renderTxList($('sumTxs'), txs.slice().sort((a,b) => (b.date + b.time + b.id).localeCompare(a.date + a.time + a.id)), true);
   $('sumBox').classList.add('on');
 }
 $('sumOk').onclick = () => $('sumBox').classList.remove('on');
+$('sumNameSave').onclick = async () => {
+  if (!detail) return;
+  const name = $('sumName').value.trim();
+  $('sumNameSave').disabled = true;
+  try{ await api('renameClose', { id: detail.close.id, name }); detail.close.name = name; toast('マルシェの名前を保存しました'); loadCloses(); }
+  catch(e){ if (e.code === 'auth') showLogin(); else toast(e.code === 'unknown_action' ? 'スプレッドシート側を新バージョンでデプロイしてください' : '保存できませんでした。電波を確認してください'); }
+  $('sumNameSave').disabled = false;
+};
 $('sumCsv').onclick = () => {
-  const s = lastSummary; if (!s) return;
-  const rows = [['マルシェ', s.name], ['日付', s.date], ['時間', s.start + '〜' + s.end], ['売上合計', s.total], ['お客さん', s.count], ['売れた数', s.qty], [],
+  if (!detail) return;
+  const c = detail.close, s = aggregate(detail.txs);
+  const rows = [['マルシェ', c.name || ''], ['日付', c.date], ['時間', c.start + '〜' + c.end], ['売上合計', s.total], ['お客さん', s.count], ['売れた数', s.qty], [],
                 ['品物','数','金額']].concat(s.items.map(a => [a.name, a.qty, a.yen]))
                 .concat([[], ['時刻','品物','単価','数','小計','取引合計','状態']]);
-  lastTxs.slice().reverse().forEach(t => t.lines.forEach(l => rows.push([t.time, l.name, l.price, l.qty, l.price*l.qty, t.total, t.canceled?'取消':''])));
+  detail.txs.slice().sort((a,b) => (a.date + a.time).localeCompare(b.date + b.time))
+    .forEach(t => t.lines.forEach(l => rows.push([t.time, l.name, l.price, l.qty, l.price*l.qty, t.total, t.canceled?'取消':''])));
   const csv = '﻿' + rows.map(r => r.map(v => '"' + String(v).replace(/"/g,'""') + '"').join(',')).join('\r\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], { type:'text/csv' }));
-  a.download = 'レジ締め_' + s.date + (s.name ? '_' + s.name : '') + '.csv';
+  a.download = 'レジ締め_' + c.date + (c.name ? '_' + c.name : '') + '.csv';
   a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 };
+
+// ---------- 締めた売上の履歴 ----------
 async function loadCloses(){
   const box = $('closes');
   try{
     const list = (await api('getCloses')).closes;
-    box.innerHTML = list.length ? list.map(c =>
-      `<div class="cl"><div class="row"><b style="flex:1">${esc(c.date)}　${esc(c.name || '')}</b><b>${yen(c.total)}</b></div>
-       <div class="mu">${esc(c.start)}〜${esc(c.end)}　${c.count}人・${c.qty}個${c.canceled ? '・取消' + c.canceled + '件' : ''}</div>
-       <div class="det mu">${esc(c.itemsText).split('、').join('<br>')}</div></div>`).join('')
+    box.innerHTML = list.length ? list.map((c, i) =>
+      `<div class="cl" data-i="${i}"><div class="row"><b style="flex:1">${esc(c.date)}　${c.name ? esc(c.name) : '<span class="mu">（名前なし）</span>'}</b><b>${yen(c.total)}</b><span class="mu">›</span></div>
+       <div class="mu">${esc(c.start)}〜${esc(c.end)}　${c.count}人・${c.qty}個${c.canceled ? '・取消' + c.canceled + '件' : ''}</div></div>`).join('')
       : '<div class="empty">まだ締めた記録はありません</div>';
-    box.querySelectorAll('.cl').forEach(d => d.onclick = () => d.classList.toggle('open'));
-  }catch(e){ if (e.code === 'auth') showLogin(); else box.innerHTML = '<div class="empty">電波がないため読みこめません</div>'; }
+    box.querySelectorAll('.cl').forEach(d => d.onclick = async () => {
+      const c = list[+d.dataset.i];
+      d.style.opacity = .5;
+      try{ const j = await api('getClose', { id: c.id }); showDetail(c, j.txs, ''); }
+      catch(e){ toast('読みこめませんでした。電波を確認してください'); }
+      d.style.opacity = '';
+    });
+  }catch(e){
+    if (e.code === 'auth') showLogin();
+    else box.innerHTML = '<div class="empty">' + (e.code === 'unknown_action' ? 'スプレッドシート側を新バージョンでデプロイしてください' : '電波がないため読みこめません') + '</div>';
+  }
 }
 
 // ---------- はじめ ----------
@@ -544,6 +603,7 @@ async function start(){
   }catch(e){ if (e.code === 'auth') { showLogin(); return; } }
   loadOpen(); flush();
 }
+renderMarket();
 if (!KEY) { renderColors(); renderCart(); renderOpen(); showLogin(); } else start();
 </script>
 </body>
