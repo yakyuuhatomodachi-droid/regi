@@ -89,6 +89,15 @@ td.r,th.r{text-align:right}
 #doneBox.on{display:flex}
 #doneBox .card{max-width:360px;width:100%;text-align:center;padding:24px}
 #doneBox .big{font-size:44px;font-weight:800;color:var(--g);margin:8px 0 16px}
+#sumBox{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:30;padding:16px}
+#sumBox.on{display:flex}
+#sumBox .card{max-width:420px;width:100%;max-height:90vh;overflow:auto;padding:20px}
+#sumBox .big{font-size:40px;font-weight:800;color:var(--g);text-align:center;margin:4px 0 12px}
+#sumHead{text-align:center}
+.cl{padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.cl .det{display:none;margin-top:8px}
+.cl.open .det{display:block}
+#runTotal{background:var(--gl);color:var(--g);border-radius:10px;padding:8px 12px;font-size:14px;margin-bottom:10px;display:flex;justify-content:space-between}
 #login{position:fixed;inset:0;background:var(--bg);z-index:40;display:none;align-items:center;justify-content:center;padding:16px}
 #login.on{display:flex}
 #login .card{max-width:360px;width:100%}
@@ -115,6 +124,7 @@ td.r,th.r{text-align:right}
         <div id="items"></div>
       </div>
       <div class="card" id="cartCard">
+        <div id="runTotal"><span>今回のマルシェの売上</span><b id="runYen">0円（0人）</b></div>
         <h2>お会計</h2>
         <ul id="cart"></ul>
         <div class="sum"><span>合計</span><span class="big" id="total">0円</span></div>
@@ -159,7 +169,7 @@ td.r,th.r{text-align:right}
   <section id="p-uriage" class="pane">
     <div class="card">
       <div class="row">
-        <input id="day" type="date" style="flex:1">
+        <h2 style="flex:1;margin:0">今回のマルシェ <span class="mu">（まだ締めていない分）</span></h2>
         <button class="btn sub" id="reload">更新</button>
       </div>
       <div class="stats" style="margin-top:12px">
@@ -177,9 +187,15 @@ td.r,th.r{text-align:right}
       <h2>取引の履歴 <span class="mu">（新しい順）</span></h2>
       <div id="txs"></div>
     </div>
+    <div class="card shime">
+      <h2>売上の締め</h2>
+      <p class="mu" style="margin:0 0 10px">マルシェが終わったら締めます。集計がスプレッドシートの「締め」シートに記録され、レジの売上は0にもどります。</p>
+      <input id="closeName" placeholder="マルシェの名前（例：あさぎり朝市）※なくてもOK" style="margin-bottom:10px">
+      <button class="btn" id="closeBtn" style="width:100%">売上を締める</button>
+    </div>
     <div class="card">
-      <button class="btn sub" id="csv" style="width:100%">この日の売上をファイルに保存（エクセルで開けます）</button>
-      <p class="mu" style="margin:10px 0 0">記録はすべてスプレッドシートの「取引」「明細」シートに入っています。</p>
+      <h2>これまでの締め <span class="mu">（新しい順）</span></h2>
+      <div id="closes"></div>
     </div>
   </section>
 </main>
@@ -189,6 +205,21 @@ td.r,th.r{text-align:right}
   <div class="mu" id="doneSub"></div>
   <div class="big" id="doneChange"></div>
   <button class="btn" id="doneOk" style="width:100%">次のお客さん</button>
+</div></div>
+
+<div id="sumBox"><div class="card">
+  <div class="mu" id="sumHead"></div>
+  <div class="big" id="sumTotal"></div>
+  <div class="stats" style="margin-bottom:12px">
+    <div class="stat"><span class="mu">お客さん</span><b id="sumCount"></b></div>
+    <div class="stat"><span class="mu">売れた数</span><b id="sumQty"></b></div>
+    <div class="stat"><span class="mu">取消</span><b id="sumCx"></b></div>
+  </div>
+  <table><thead><tr><th>品物</th><th class="r">数</th><th class="r">金額</th></tr></thead><tbody id="sumItems"></tbody></table>
+  <div class="row" style="margin-top:14px">
+    <button class="btn sub" id="sumCsv" style="flex:1">ファイルに保存</button>
+    <button class="btn" id="sumOk" style="flex:1">閉じる</button>
+  </div>
 </div></div>
 
 <div id="login"><div class="card">
@@ -206,7 +237,7 @@ td.r,th.r{text-align:right}
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbz3YayhvzJ6REioKQerUPXrVbpi9KgeYQlYpp5uVwZERbTvIzqoec4a43S0MGbW8yWwGQ/exec';
 
 const COLORS = ['#2E6B4E','#7CB342','#E53935','#FB8C00','#FDD835','#8E24AA','#1E88E5','#6D4C41'];
-const LS = { key:'aquaRegi.key', items:'aquaRegi.items', queue:'aquaRegi.queue' };
+const LS = { key:'aquaRegi.key', items:'aquaRegi.items', queue:'aquaRegi.queue', open:'aquaRegi.open' };
 const $ = id => document.getElementById(id);
 const yen = n => Number(n).toLocaleString('ja-JP') + '円';
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -222,7 +253,8 @@ let queue = lsGet(LS.queue, []);   // まだ送れていない取引
 let cart = {};                      // 品物の順番 → 数
 let paid = null;                    // あずかり（null=未入力）
 let editIdx = -1, pickColor = COLORS[0];
-let dayData = [];
+let serverOpen = lsGet(LS.open, []);  // スプレッドシートにある、まだ締めていない取引
+let openData = [];
 
 // ---------- 通信 ----------
 // ほかのアプリと同じく、通信はすべてGET（合言葉は pw で送る）
@@ -255,7 +287,7 @@ async function flush(){
     }
   }catch(e){ if (e.code === 'auth') showLogin('合言葉が変わりました。もう一度入れてください'); }
   sending = false; setNet();
-  if ($('p-uriage').classList.contains('on')) renderDay();
+  await loadOpen();
 }
 window.addEventListener('online', flush);
 window.addEventListener('offline', setNet);
@@ -275,7 +307,7 @@ $('pwOk').onclick = async () => {
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
   document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b));
   document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === 'p-' + b.dataset.p));
-  if (b.dataset.p === 'uriage') renderDay();
+  if (b.dataset.p === 'uriage') { loadOpen(); loadCloses(); }
   window.scrollTo(0, 0);
 });
 
@@ -328,7 +360,7 @@ $('record').onclick = () => {
   $('doneSub').textContent = '合計 ' + yen(total) + (paidValue !== null ? '　あずかり ' + yen(paidValue) : '');
   $('doneChange').textContent = paidValue !== null ? 'おつり ' + yen(paidValue - total) : yen(total);
   $('doneBox').classList.add('on');
-  resetCart(); flush();
+  resetCart(); renderOpen(); flush();
 };
 $('doneOk').onclick = () => $('doneBox').classList.remove('on');
 
@@ -370,52 +402,117 @@ async function saveItems(){
   catch(e){ if (e.code === 'auth') showLogin(); else toast('電波がないため、この端末だけに保存しました'); }
 }
 
-// ---------- 売上 ----------
-$('day').value = today();
-$('day').onchange = renderDay;
-$('reload').onclick = renderDay;
-async function renderDay(){
-  const date = $('day').value || today();
-  const local = queue.filter(t => t.date === date).map(t => Object.assign({ pending: true }, t));
-  let server = [];
-  try{ server = (await api('getDay', { date })).txs; $('pending').textContent = ''; }
-  catch(e){ if (e.code === 'auth') { showLogin(); return; } $('pending').textContent = 'スプレッドシートにつながらないため、この端末の未送信分だけ表示しています。'; }
-  const ids = new Set(server.map(t => t.id));
-  dayData = server.concat(local.filter(t => !ids.has(t.id))).sort((a,b) => (b.time + b.id).localeCompare(a.time + a.id));
-  const live = dayData.filter(t => !t.canceled);
-  $('sTotal').textContent = yen(live.reduce((s,t) => s + t.total, 0));
-  $('sCount').textContent = live.length + '人';
-  const agg = {};
-  live.forEach(t => t.lines.forEach(l => { const a = agg[l.name] || (agg[l.name] = { q:0, y:0 }); a.q += l.qty; a.y += l.price * l.qty; }));
-  $('sQty').textContent = Object.values(agg).reduce((s,a) => s + a.q, 0) + '個';
-  $('byItem').innerHTML = Object.keys(agg).length ? Object.entries(agg).sort((a,b) => b[1].y - a[1].y)
-    .map(([n,a]) => `<tr><td>${esc(n)}</td><td class="r">${a.q}</td><td class="r">${yen(a.y)}</td></tr>`).join('')
+// ---------- 売上（今回のマルシェ＝まだ締めていない分） ----------
+function aggregate(txs){
+  const live = txs.filter(t => !t.canceled), agg = {};
+  live.forEach(t => t.lines.forEach(l => { const a = agg[l.name] || (agg[l.name] = { name:l.name, qty:0, yen:0 }); a.qty += l.qty; a.yen += l.price * l.qty; }));
+  const list = Object.values(agg).sort((a,b) => b.yen - a.yen);
+  return { total: live.reduce((s,t) => s + t.total, 0), count: live.length, qty: list.reduce((s,a) => s + a.qty, 0), items: list, canceled: txs.length - live.length };
+}
+function itemRows(list){
+  return list.length ? list.map(a => `<tr><td>${esc(a.name)}</td><td class="r">${a.qty}</td><td class="r">${yen(a.yen)}</td></tr>`).join('')
     : '<tr><td colspan="3" class="empty">まだ売上がありません</td></tr>';
-  $('txs').innerHTML = dayData.length ? dayData.map(t =>
+}
+function buildOpen(){
+  const ids = new Set(serverOpen.map(t => t.id));
+  openData = serverOpen.concat(queue.filter(t => !ids.has(t.id)).map(t => Object.assign({ pending: true }, t)))
+    .sort((a,b) => (b.date + b.time + b.id).localeCompare(a.date + a.time + a.id));
+}
+function renderOpen(){
+  buildOpen();
+  const s = aggregate(openData);
+  $('runYen').textContent = yen(s.total) + '（' + s.count + '人）';
+  $('sTotal').textContent = yen(s.total);
+  $('sCount').textContent = s.count + '人';
+  $('sQty').textContent = s.qty + '個';
+  $('byItem').innerHTML = itemRows(s.items);
+  $('txs').innerHTML = openData.length ? openData.map(t =>
     `<div class="tx ${t.canceled?'cx':''}"><div class="row"><b style="flex:1">${esc(t.time)}　<span class="amt">${yen(t.total)}</span>
       ${t.pending?'<span class="tag">未送信</span>':''}${t.canceled?'<span class="tag gray">取消</span>':''}</b>
       ${!t.canceled?`<button class="ib" data-id="${esc(t.id)}" style="color:var(--red)">取り消す</button>`:''}</div>
       <div class="mu">${t.lines.map(l => esc(l.name) + '×' + l.qty).join('、')}${t.paid!=null?'　あずかり'+yen(t.paid)+'・おつり'+yen(t.change):''}</div></div>`).join('')
-    : '<div class="empty">この日の取引はありません</div>';
+    : '<div class="empty">まだ取引はありません</div>';
   $('txs').querySelectorAll('button[data-id]').forEach(b => b.onclick = () => cancelTx(b.dataset.id));
 }
+async function loadOpen(){
+  renderOpen();
+  try{
+    serverOpen = (await api('getOpen')).txs; lsSet(LS.open, serverOpen);
+    $('pending').textContent = '';
+  }catch(e){
+    if (e.code === 'auth') { showLogin(); return; }
+    $('pending').textContent = 'スプレッドシートにつながらないため、最後に読みこんだ内容を表示しています。';
+  }
+  renderOpen();
+}
+$('reload').onclick = () => { flush(); loadCloses(); };
 async function cancelTx(id){
   if (!confirm('この取引を取り消しますか？（スプレッドシートには「取消」として残ります）')) return;
   const q = queue.findIndex(t => t.id === id);
-  if (q >= 0){ queue.splice(q, 1); lsSet(LS.queue, queue); setNet(); renderDay(); return; }
-  try{ await api('cancelTx', { id }); toast('取り消しました'); renderDay(); }
-  catch(e){ toast('電波がないため取り消せませんでした'); }
+  if (q >= 0){ queue.splice(q, 1); lsSet(LS.queue, queue); setNet(); renderOpen(); return; }
+  try{ await api('cancelTx', { id }); toast('取り消しました'); loadOpen(); }
+  catch(e){ toast(e.code === 'closed' ? '締めたあとの取引は取り消せません' : '電波がないため取り消せませんでした'); }
 }
-$('csv').onclick = () => {
-  if (!dayData.length){ toast('この日の取引はありません'); return; }
-  const rows = [['日付','時刻','品物','単価','数','小計','取引合計','状態']];
-  dayData.slice().reverse().forEach(t => t.lines.forEach(l => rows.push([t.date, t.time, l.name, l.price, l.qty, l.price*l.qty, t.total, t.canceled?'取消':''])));
-  const csv = '\uFEFF' + rows.map(r => r.map(v => '"' + String(v).replace(/"/g,'""') + '"').join(',')).join('\r\n');
+
+// ---------- 締め ----------
+let lastSummary = null, lastTxs = [];
+$('closeBtn').onclick = async () => {
+  if (!navigator.onLine){ toast('電波のある所で締めてください'); return; }
+  await flush();
+  if (queue.length){ toast('未送信の会計があります。電波のある所でもう一度押してください'); return; }
+  buildOpen();
+  if (!openData.length){ toast('締める売上がありません'); return; }
+  const s = aggregate(openData);
+  if (!confirm('売上を締めますか？\n\n売上 ' + yen(s.total) + '（' + s.count + '人）\n\n集計を記録して、レジの売上を0にもどします。')) return;
+  $('closeBtn').disabled = true;
+  try{
+    lastTxs = openData.slice();
+    const j = await api('closeSession', { name: $('closeName').value.trim() });
+    lastSummary = j.summary;
+    serverOpen = []; lsSet(LS.open, serverOpen);
+    $('closeName').value = '';
+    renderOpen(); showSummary(lastSummary); loadCloses();
+  }catch(e){
+    if (e.code === 'auth') showLogin();
+    else if (e.code === 'empty') { toast('締める売上がありません'); loadOpen(); }
+    else toast('締められませんでした。電波を確認してもう一度押してください');
+  }
+  $('closeBtn').disabled = false;
+};
+function showSummary(s){
+  $('sumHead').textContent = '締めました　' + s.date + '　' + s.start + '〜' + s.end + (s.name ? '　' + s.name : '');
+  $('sumTotal').textContent = yen(s.total);
+  $('sumCount').textContent = s.count + '人';
+  $('sumQty').textContent = s.qty + '個';
+  $('sumCx').textContent = s.canceled + '件';
+  $('sumItems').innerHTML = itemRows(s.items);
+  $('sumBox').classList.add('on');
+}
+$('sumOk').onclick = () => $('sumBox').classList.remove('on');
+$('sumCsv').onclick = () => {
+  const s = lastSummary; if (!s) return;
+  const rows = [['マルシェ', s.name], ['日付', s.date], ['時間', s.start + '〜' + s.end], ['売上合計', s.total], ['お客さん', s.count], ['売れた数', s.qty], [],
+                ['品物','数','金額']].concat(s.items.map(a => [a.name, a.qty, a.yen]))
+                .concat([[], ['時刻','品物','単価','数','小計','取引合計','状態']]);
+  lastTxs.slice().reverse().forEach(t => t.lines.forEach(l => rows.push([t.time, l.name, l.price, l.qty, l.price*l.qty, t.total, t.canceled?'取消':''])));
+  const csv = '﻿' + rows.map(r => r.map(v => '"' + String(v).replace(/"/g,'""') + '"').join(',')).join('\r\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], { type:'text/csv' }));
-  a.download = 'レジ売上_' + ($('day').value || today()) + '.csv';
+  a.download = 'レジ締め_' + s.date + (s.name ? '_' + s.name : '') + '.csv';
   a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 };
+async function loadCloses(){
+  const box = $('closes');
+  try{
+    const list = (await api('getCloses')).closes;
+    box.innerHTML = list.length ? list.map(c =>
+      `<div class="cl"><div class="row"><b style="flex:1">${esc(c.date)}　${esc(c.name || '')}</b><b>${yen(c.total)}</b></div>
+       <div class="mu">${esc(c.start)}〜${esc(c.end)}　${c.count}人・${c.qty}個${c.canceled ? '・取消' + c.canceled + '件' : ''}</div>
+       <div class="det mu">${esc(c.itemsText).split('、').join('<br>')}</div></div>`).join('')
+      : '<div class="empty">まだ締めた記録はありません</div>';
+    box.querySelectorAll('.cl').forEach(d => d.onclick = () => d.classList.toggle('open'));
+  }catch(e){ if (e.code === 'auth') showLogin(); else box.innerHTML = '<div class="empty">電波がないため読みこめません</div>'; }
+}
 
 // ---------- はじめ ----------
 async function start(){
@@ -424,9 +521,9 @@ async function start(){
     const j = await api('getItems');
     items = j.items; lsSet(LS.items, items); cart = {}; renderIlist(); renderCart();
   }catch(e){ if (e.code === 'auth') { showLogin(); return; } }
-  flush();
+  loadOpen(); flush();
 }
-if (!KEY) { renderColors(); renderCart(); showLogin(); } else start();
+if (!KEY) { renderColors(); renderCart(); renderOpen(); showLogin(); } else start();
 </script>
 </body>
 </html>
