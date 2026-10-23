@@ -19,6 +19,8 @@ button{font:inherit;cursor:pointer;border:none;border-radius:10px}
 input,select{font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;width:100%}
 header{background:var(--g);color:#fff;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:5}
 header h1{font-size:18px;margin:0;flex:1}
+#toTop{color:#fff;text-decoration:none;font-size:14px;font-weight:700;background:rgba(255,255,255,.18);padding:6px 10px;border-radius:8px;white-space:nowrap}
+#toTop:active{background:rgba(255,255,255,.32)}
 #net{font-size:12px;background:rgba(255,255,255,.18);padding:4px 10px;border-radius:99px;white-space:nowrap}
 #net.warn{background:var(--or)}
 nav{display:flex;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:calc(48px + env(safe-area-inset-top));z-index:4}
@@ -108,6 +110,7 @@ td.r,th.r{text-align:right}
 <body>
 
 <header>
+  <a id="toTop" href="https://yakyuuhatomodachi-droid.github.io/" aria-label="トップへ戻る">‹ トップ</a>
   <h1>アクア農園 レジ</h1>
   <span id="net">接続中…</span>
 </header>
@@ -290,6 +293,7 @@ async function flush(){
       const t = queue[0];
       const j = await api('addTx', { txs: [t] });
       if (j.saved.indexOf(t.id) < 0) break;
+      if (!serverOpen.some(x => x.id === t.id)) { serverOpen.push(t); lsSet(LS.open, serverOpen); }
       queue = queue.filter(x => x.id !== t.id);
       lsSet(LS.queue, queue); setNet();
     }
@@ -455,11 +459,14 @@ async function loadOpen(){
     $('pending').textContent = '';
   }catch(e){
     if (e.code === 'auth') { showLogin(); return; }
-    $('pending').textContent = 'スプレッドシートにつながらないため、最後に読みこんだ内容を表示しています。';
+    if (e.code === 'unknown_action') toast('スプレッドシート側のプログラムを新バージョンでデプロイしてください');
+    $('pending').innerHTML = e.code === 'unknown_action'
+      ? '<b style="color:var(--red)">スプレッドシート側のプログラムが古いままです。Apps Scriptで「デプロイを管理」→ 鉛筆 →「新バージョン」でデプロイしてください。</b>'
+      : 'スプレッドシートにつながらないため、最後に読みこんだ内容を表示しています。';
   }
   renderOpen();
 }
-$('reload').onclick = () => { flush(); loadCloses(); };
+$('reload').onclick = async () => { await flush(); loadOpen(); loadCloses(); };
 async function cancelTx(id){
   if (!confirm('この取引を取り消しますか？（スプレッドシートには「取消」として残ります）')) return;
   const q = queue.findIndex(t => t.id === id);
