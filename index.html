@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2E6B4E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="レジ">
+<meta name="format-detection" content="telephone=no">
+<title>レジ｜アクア農園</title>
+<style>
+:root{
+  --g:#2E6B4E; --g2:#3E8A65; --gl:#E8F1EC; --bg:#F6F7F5; --card:#fff; --tx:#1F2A24; --mu:#6B7A71;
+  --line:#DDE3DF; --red:#C0392B; --or:#D9822B;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;font-size:16px}
+button{font:inherit;cursor:pointer;border:none;border-radius:10px}
+input,select{font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;width:100%}
+header{background:var(--g);color:#fff;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:5}
+header h1{font-size:18px;margin:0;flex:1}
+#net{font-size:12px;background:rgba(255,255,255,.18);padding:4px 10px;border-radius:99px;white-space:nowrap}
+#net.warn{background:var(--or)}
+nav{display:flex;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:calc(48px + env(safe-area-inset-top));z-index:4}
+nav button{flex:1;background:none;border-radius:0;padding:12px 4px;color:var(--mu);font-weight:600;border-bottom:3px solid transparent}
+nav button.on{color:var(--g);border-bottom-color:var(--g)}
+main{max-width:1200px;margin:0 auto;padding:14px 16px 40px}
+.pane{display:none}.pane.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.card+.card{margin-top:12px}
+h2{font-size:16px;margin:0 0 10px}
+.mu{color:var(--mu);font-size:13px}
+.btn{background:var(--g);color:#fff;padding:12px 16px;font-weight:700}
+.btn.sub{background:var(--gl);color:var(--g)}
+.btn.red{background:#fff;color:var(--red);border:1px solid var(--red)}
+.btn:disabled{opacity:.4}
+.row{display:flex;gap:8px;align-items:center}
+.row>*{min-width:0}
+
+/* 会計 */
+#kaikei{display:grid;gap:12px}
+@media (min-width:820px){ #kaikei{grid-template-columns:1.4fr 1fr;align-items:start} #cartCard{position:sticky;top:110px} }
+#items{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
+.item{background:#fff;border:2px solid var(--line);border-left:8px solid var(--c,var(--g));padding:14px 10px;text-align:left;min-height:84px;display:flex;flex-direction:column;justify-content:space-between;position:relative}
+.item:active{transform:scale(.97);background:var(--gl)}
+.item b{font-size:17px;line-height:1.3;word-break:break-all}
+.item span{color:var(--mu);font-size:14px;margin-top:6px}
+.item .badge{position:absolute;top:-8px;right:-8px;background:var(--red);color:#fff;border-radius:99px;min-width:26px;height:26px;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 6px}
+#cart{list-style:none;margin:0;padding:0;max-height:260px;overflow:auto}
+#cart li{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+#cart li .nm{flex:1;min-width:0}
+#cart li .nm small{display:block;color:var(--mu)}
+.qb{width:36px;height:36px;background:var(--gl);color:var(--g);font-size:20px;font-weight:700;padding:0}
+.qty{min-width:28px;text-align:center;font-weight:700}
+.sum{display:flex;justify-content:space-between;align-items:baseline;padding:10px 0}
+.sum .big{font-size:34px;font-weight:800;color:var(--g)}
+.paybtns{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:6px 0}
+.paybtns button{background:#fff;border:1px solid var(--line);padding:12px 0;font-weight:700}
+.paybtns button.on{background:var(--g);color:#fff;border-color:var(--g)}
+#change.big{font-size:30px}
+#change.short{color:var(--red)}
+.empty{color:var(--mu);text-align:center;padding:22px 0}
+
+/* 品物 */
+.ilist{list-style:none;margin:0;padding:0}
+.ilist li{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line)}
+.ilist .sw{width:14px;height:36px;border-radius:4px;flex:none}
+.ilist .nm{flex:1;min-width:0}
+.ib{background:var(--gl);color:var(--g);padding:8px 10px;font-size:14px}
+.colors{display:flex;gap:8px;flex-wrap:wrap}
+.colors button{width:34px;height:34px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px var(--line)}
+.colors button.on{box-shadow:0 0 0 3px var(--tx)}
+
+/* 売上 */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--gl);border-radius:12px;padding:10px;text-align:center}
+.stat b{display:block;font-size:22px;color:var(--g)}
+table{width:100%;border-collapse:collapse;font-size:15px}
+td,th{padding:8px 4px;border-bottom:1px solid var(--line);text-align:left}
+td.r,th.r{text-align:right}
+.tx{padding:10px 0;border-bottom:1px solid var(--line)}
+.tx.cx{opacity:.45}.tx.cx .amt{text-decoration:line-through}
+.tag{font-size:11px;padding:2px 8px;border-radius:99px;background:var(--or);color:#fff;margin-left:6px}
+.tag.gray{background:#999}
+
+#toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--tx);color:#fff;padding:12px 18px;border-radius:12px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;z-index:20;max-width:90vw;text-align:center}
+#toast.on{opacity:1}
+#doneBox{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:30;padding:16px}
+#doneBox.on{display:flex}
+#doneBox .card{max-width:360px;width:100%;text-align:center;padding:24px}
+#doneBox .big{font-size:44px;font-weight:800;color:var(--g);margin:8px 0 16px}
+#login{position:fixed;inset:0;background:var(--bg);z-index:40;display:none;align-items:center;justify-content:center;padding:16px}
+#login.on{display:flex}
+#login .card{max-width:360px;width:100%}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>アクア農園 レジ</h1>
+  <span id="net">接続中…</span>
+</header>
+<nav>
+  <button data-p="kaikei" class="on">会計</button>
+  <button data-p="shina">品物</button>
+  <button data-p="uriage">売上</button>
+</nav>
+
+<main>
+  <!-- 会計 -->
+  <section id="p-kaikei" class="pane on">
+    <div id="kaikei">
+      <div class="card">
+        <h2>売れた品物を押す <span class="mu">（2個なら2回）</span></h2>
+        <div id="items"></div>
+      </div>
+      <div class="card" id="cartCard">
+        <h2>お会計</h2>
+        <ul id="cart"></ul>
+        <div class="sum"><span>合計</span><span class="big" id="total">0円</span></div>
+        <div class="mu">あずかったお金</div>
+        <div class="paybtns" id="paybtns">
+          <button data-v="exact">ちょうど</button>
+          <button data-v="1000">1,000</button>
+          <button data-v="5000">5,000</button>
+          <button data-v="10000">10,000</button>
+        </div>
+        <input id="paid" type="number" inputmode="numeric" placeholder="そのほかの金額（円）">
+        <div class="sum"><span>おつり</span><span class="big" id="change">―</span></div>
+        <div class="row">
+          <button class="btn sub" id="clearCart" style="flex:1">やり直す</button>
+          <button class="btn" id="record" style="flex:2">会計を記録する</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 品物 -->
+  <section id="p-shina" class="pane">
+    <div class="card">
+      <h2 id="formTitle">品物を追加</h2>
+      <div class="row" style="margin-bottom:8px">
+        <input id="iName" placeholder="品物の名前（例：レタス）" style="flex:2">
+        <input id="iPrice" type="number" inputmode="numeric" placeholder="値段（税込）" style="flex:1">
+      </div>
+      <div class="colors" id="colors" style="margin-bottom:10px"></div>
+      <div class="row">
+        <button class="btn sub" id="cancelEdit" style="display:none;flex:1">やめる</button>
+        <button class="btn" id="saveItem" style="flex:2">追加する</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>登録した品物 <span class="mu">（スプレッドシートの「品物」シートに保存）</span></h2>
+      <ul class="ilist" id="ilist"></ul>
+    </div>
+  </section>
+
+  <!-- 売上 -->
+  <section id="p-uriage" class="pane">
+    <div class="card">
+      <div class="row">
+        <input id="day" type="date" style="flex:1">
+        <button class="btn sub" id="reload">更新</button>
+      </div>
+      <div class="stats" style="margin-top:12px">
+        <div class="stat"><span class="mu">売上</span><b id="sTotal">0円</b></div>
+        <div class="stat"><span class="mu">お客さん</span><b id="sCount">0人</b></div>
+        <div class="stat"><span class="mu">売れた数</span><b id="sQty">0個</b></div>
+      </div>
+      <div id="pending" class="mu" style="margin-top:10px"></div>
+    </div>
+    <div class="card">
+      <h2>品物ごとの売上</h2>
+      <table><thead><tr><th>品物</th><th class="r">数</th><th class="r">金額</th></tr></thead><tbody id="byItem"></tbody></table>
+    </div>
+    <div class="card">
+      <h2>取引の履歴 <span class="mu">（新しい順）</span></h2>
+      <div id="txs"></div>
+    </div>
+    <div class="card">
+      <button class="btn sub" id="csv" style="width:100%">この日の売上をファイルに保存（エクセルで開けます）</button>
+      <p class="mu" style="margin:10px 0 0">記録はすべてスプレッドシートの「取引」「明細」シートに入っています。</p>
+    </div>
+  </section>
+</main>
+
+<div id="doneBox"><div class="card">
+  <div>記録しました</div>
+  <div class="mu" id="doneSub"></div>
+  <div class="big" id="doneChange"></div>
+  <button class="btn" id="doneOk" style="width:100%">次のお客さん</button>
+</div></div>
+
+<div id="login"><div class="card">
+  <h2>合言葉を入れてください</h2>
+  <p class="mu">はじめて開いたときだけ入力します。</p>
+  <input id="pw" type="password" placeholder="合言葉" autocomplete="current-password">
+  <button class="btn" id="pwOk" style="width:100%;margin-top:10px">はじめる</button>
+  <p class="mu" id="pwMsg" style="color:var(--red)"></p>
+</div></div>
+
+<div id="toast"></div>
+
+<script>
+// ▼ GASの「ウェブアプリのURL」（…/exec）をここに貼る
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbz3YayhvzJ6REioKQerUPXrVbpi9KgeYQlYpp5uVwZERbTvIzqoec4a43S0MGbW8yWwGQ/exec';
+
+const COLORS = ['#2E6B4E','#7CB342','#E53935','#FB8C00','#FDD835','#8E24AA','#1E88E5','#6D4C41'];
+const LS = { key:'aquaRegi.key', items:'aquaRegi.items', queue:'aquaRegi.queue' };
+const $ = id => document.getElementById(id);
+const yen = n => Number(n).toLocaleString('ja-JP') + '円';
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function lsGet(k, d){ try{ const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); }catch(e){ return d; } }
+function lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+function today(){ const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function nowTime(){ const d = new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function toast(m){ const t = $('toast'); t.textContent = m; t.classList.add('on'); clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove('on'), 2200); }
+
+let KEY = lsGet(LS.key, '');
+let items = lsGet(LS.items, []);
+let queue = lsGet(LS.queue, []);   // まだ送れていない取引
+let cart = {};                      // 品物の順番 → 数
+let paid = null;                    // あずかり（null=未入力）
+let editIdx = -1, pickColor = COLORS[0];
+let dayData = [];
+
+// ---------- 通信 ----------
+// ほかのアプリと同じく、通信はすべてGET（合言葉は pw で送る）
+async function api(action, data){
+  let url = GAS_URL + '?action=' + encodeURIComponent(action) + '&pw=' + encodeURIComponent(KEY);
+  if (data) url += '&data=' + encodeURIComponent(JSON.stringify(data));
+  const res = await fetch(url);
+  const j = await res.json();
+  if (!j.ok) { const e = new Error(j.error); e.code = j.error; throw e; }
+  return j;
+}
+function setNet(){
+  const n = $('net');
+  if (queue.length){ n.textContent = '未送信 ' + queue.length + '件'; n.classList.add('warn'); }
+  else if (!navigator.onLine){ n.textContent = '電波なし'; n.classList.add('warn'); }
+  else { n.textContent = 'スプレッドシート連携中'; n.classList.remove('warn'); }
+}
+let sending = false;
+async function flush(){
+  if (sending || !queue.length || !navigator.onLine) { setNet(); return; }
+  sending = true;
+  try{
+    // URLが長くなりすぎないよう、1件ずつ送る
+    while (queue.length){
+      const t = queue[0];
+      const j = await api('addTx', { txs: [t] });
+      if (j.saved.indexOf(t.id) < 0) break;
+      queue = queue.filter(x => x.id !== t.id);
+      lsSet(LS.queue, queue); setNet();
+    }
+  }catch(e){ if (e.code === 'auth') showLogin('合言葉が変わりました。もう一度入れてください'); }
+  sending = false; setNet();
+  if ($('p-uriage').classList.contains('on')) renderDay();
+}
+window.addEventListener('online', flush);
+window.addEventListener('offline', setNet);
+setInterval(flush, 30000);
+
+// ---------- 合言葉 ----------
+function showLogin(m){ $('login').classList.add('on'); $('pwMsg').textContent = m || ''; }
+$('pwOk').onclick = async () => {
+  KEY = $('pw').value.trim(); if (!KEY) return;
+  $('pwOk').disabled = true;
+  try{ await api('check'); lsSet(LS.key, KEY); $('login').classList.remove('on'); start(); }
+  catch(e){ $('pwMsg').textContent = e.code === 'auth' ? '合言葉がちがいます' : 'つながりません。電波とURLを確認してください'; }
+  $('pwOk').disabled = false;
+};
+
+// ---------- タブ ----------
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === 'p-' + b.dataset.p));
+  if (b.dataset.p === 'uriage') renderDay();
+  window.scrollTo(0, 0);
+});
+
+// ---------- 会計 ----------
+function renderItems(){
+  const box = $('items');
+  if (!items.length){ box.innerHTML = '<div class="empty" style="grid-column:1/-1">「品物」タブで品物と値段を登録してください</div>'; return; }
+  box.innerHTML = items.map((it, i) =>
+    `<button class="item" data-i="${i}" style="--c:${esc(it.color||COLORS[0])}"><b>${esc(it.name)}</b><span>${yen(it.price)}</span>${cart[i]?`<div class="badge">${cart[i]}</div>`:''}</button>`).join('');
+  box.querySelectorAll('.item').forEach(b => b.onclick = () => { const i = +b.dataset.i; cart[i] = (cart[i]||0) + 1; renderCart(); });
+}
+function cartTotal(){ return Object.entries(cart).reduce((s,[i,q]) => s + (items[i]?items[i].price:0) * q, 0); }
+function renderCart(){
+  const ul = $('cart'), ent = Object.entries(cart).filter(([i,q]) => q > 0 && items[i]);
+  ul.innerHTML = ent.length ? ent.map(([i,q]) =>
+    `<li><div class="nm">${esc(items[i].name)}<small>${yen(items[i].price)} × ${q} ＝ ${yen(items[i].price*q)}</small></div>
+     <button class="qb" data-i="${i}" data-d="-1">−</button><span class="qty">${q}</span><button class="qb" data-i="${i}" data-d="1">＋</button></li>`).join('')
+    : '<li class="empty" style="display:block">品物を押すとここに入ります</li>';
+  ul.querySelectorAll('.qb').forEach(b => b.onclick = () => { const i = b.dataset.i; cart[i] = Math.max(0, cart[i] + +b.dataset.d); if (!cart[i]) delete cart[i]; renderCart(); });
+  const total = cartTotal();
+  $('total').textContent = yen(total);
+  if (paid === 'exact') paidValue = total;
+  renderChange();
+  renderItems();
+}
+let paidValue = null;
+function renderChange(){
+  const total = cartTotal(), c = $('change');
+  document.querySelectorAll('#paybtns button').forEach(b => b.classList.toggle('on', String(paid) === b.dataset.v));
+  if (paid === 'exact') paidValue = total;
+  if (paidValue === null || !total){ c.textContent = '―'; c.classList.remove('short'); return; }
+  const d = paidValue - total;
+  c.textContent = d < 0 ? 'あと' + yen(-d) : yen(d);
+  c.classList.toggle('short', d < 0);
+}
+document.querySelectorAll('#paybtns button').forEach(b => b.onclick = () => {
+  paid = b.dataset.v; paidValue = paid === 'exact' ? cartTotal() : +paid; $('paid').value = ''; renderChange();
+});
+$('paid').oninput = e => { const v = e.target.value; paid = v === '' ? null : 'input'; paidValue = v === '' ? null : +v; renderChange(); };
+function resetCart(){ cart = {}; paid = null; paidValue = null; $('paid').value = ''; renderCart(); }
+$('clearCart').onclick = resetCart;
+$('record').onclick = () => {
+  const total = cartTotal();
+  if (!total){ toast('品物を押してください'); return; }
+  if (paidValue !== null && paidValue < total){ toast('あずかったお金が足りません'); return; }
+  const lines = Object.entries(cart).filter(([i,q]) => q > 0).map(([i,q]) => ({ name: items[i].name, price: items[i].price, qty: q }));
+  const tx = { id: Date.now().toString(36) + Math.random().toString(36).slice(2,6), date: today(), time: nowTime(),
+               total, paid: paidValue, change: paidValue === null ? null : paidValue - total, lines };
+  queue.push(tx); lsSet(LS.queue, queue);
+  $('doneSub').textContent = '合計 ' + yen(total) + (paidValue !== null ? '　あずかり ' + yen(paidValue) : '');
+  $('doneChange').textContent = paidValue !== null ? 'おつり ' + yen(paidValue - total) : yen(total);
+  $('doneBox').classList.add('on');
+  resetCart(); flush();
+};
+$('doneOk').onclick = () => $('doneBox').classList.remove('on');
+
+// ---------- 品物 ----------
+function renderColors(){
+  $('colors').innerHTML = COLORS.map(c => `<button style="background:${c}" data-c="${c}" class="${c===pickColor?'on':''}" aria-label="色"></button>`).join('');
+  $('colors').querySelectorAll('button').forEach(b => b.onclick = () => { pickColor = b.dataset.c; renderColors(); });
+}
+function renderIlist(){
+  const ul = $('ilist');
+  ul.innerHTML = items.length ? items.map((it, i) =>
+    `<li><span class="sw" style="background:${esc(it.color||COLORS[0])}"></span><div class="nm"><b>${esc(it.name)}</b><div class="mu">${yen(it.price)}</div></div>
+     <button class="ib" data-a="up" data-i="${i}" ${i===0?'disabled':''}>↑</button>
+     <button class="ib" data-a="ed" data-i="${i}">直す</button>
+     <button class="ib" data-a="del" data-i="${i}" style="color:var(--red)">消す</button></li>`).join('')
+    : '<li class="empty" style="display:block">まだ品物がありません</li>';
+  ul.querySelectorAll('button').forEach(b => b.onclick = () => {
+    const i = +b.dataset.i;
+    if (b.dataset.a === 'up' && i > 0){ [items[i-1], items[i]] = [items[i], items[i-1]]; saveItems(); }
+    if (b.dataset.a === 'del' && confirm('「' + items[i].name + '」を消しますか？')){ items.splice(i, 1); saveItems(); }
+    if (b.dataset.a === 'ed'){
+      editIdx = i; $('iName').value = items[i].name; $('iPrice').value = items[i].price; pickColor = items[i].color || COLORS[0];
+      $('formTitle').textContent = '品物を直す'; $('saveItem').textContent = '直す'; $('cancelEdit').style.display = ''; renderColors(); window.scrollTo(0,0);
+    }
+  });
+}
+function endEdit(){ editIdx = -1; $('iName').value = ''; $('iPrice').value = ''; $('formTitle').textContent = '品物を追加'; $('saveItem').textContent = '追加する'; $('cancelEdit').style.display = 'none'; }
+$('cancelEdit').onclick = endEdit;
+$('saveItem').onclick = () => {
+  const name = $('iName').value.trim(), price = parseInt($('iPrice').value, 10);
+  if (!name || !(price >= 0)){ toast('名前と値段を入れてください'); return; }
+  const it = { name, price, color: pickColor };
+  if (editIdx >= 0) items[editIdx] = it; else items.push(it);
+  endEdit(); saveItems();
+};
+async function saveItems(){
+  cart = {}; lsSet(LS.items, items); renderIlist(); renderCart();
+  try{ await api('saveItems', { items }); toast('品物を保存しました'); }
+  catch(e){ if (e.code === 'auth') showLogin(); else toast('電波がないため、この端末だけに保存しました'); }
+}
+
+// ---------- 売上 ----------
+$('day').value = today();
+$('day').onchange = renderDay;
+$('reload').onclick = renderDay;
+async function renderDay(){
+  const date = $('day').value || today();
+  const local = queue.filter(t => t.date === date).map(t => Object.assign({ pending: true }, t));
+  let server = [];
+  try{ server = (await api('getDay', { date })).txs; $('pending').textContent = ''; }
+  catch(e){ if (e.code === 'auth') { showLogin(); return; } $('pending').textContent = 'スプレッドシートにつながらないため、この端末の未送信分だけ表示しています。'; }
+  const ids = new Set(server.map(t => t.id));
+  dayData = server.concat(local.filter(t => !ids.has(t.id))).sort((a,b) => (b.time + b.id).localeCompare(a.time + a.id));
+  const live = dayData.filter(t => !t.canceled);
+  $('sTotal').textContent = yen(live.reduce((s,t) => s + t.total, 0));
+  $('sCount').textContent = live.length + '人';
+  const agg = {};
+  live.forEach(t => t.lines.forEach(l => { const a = agg[l.name] || (agg[l.name] = { q:0, y:0 }); a.q += l.qty; a.y += l.price * l.qty; }));
+  $('sQty').textContent = Object.values(agg).reduce((s,a) => s + a.q, 0) + '個';
+  $('byItem').innerHTML = Object.keys(agg).length ? Object.entries(agg).sort((a,b) => b[1].y - a[1].y)
+    .map(([n,a]) => `<tr><td>${esc(n)}</td><td class="r">${a.q}</td><td class="r">${yen(a.y)}</td></tr>`).join('')
+    : '<tr><td colspan="3" class="empty">まだ売上がありません</td></tr>';
+  $('txs').innerHTML = dayData.length ? dayData.map(t =>
+    `<div class="tx ${t.canceled?'cx':''}"><div class="row"><b style="flex:1">${esc(t.time)}　<span class="amt">${yen(t.total)}</span>
+      ${t.pending?'<span class="tag">未送信</span>':''}${t.canceled?'<span class="tag gray">取消</span>':''}</b>
+      ${!t.canceled?`<button class="ib" data-id="${esc(t.id)}" style="color:var(--red)">取り消す</button>`:''}</div>
+      <div class="mu">${t.lines.map(l => esc(l.name) + '×' + l.qty).join('、')}${t.paid!=null?'　あずかり'+yen(t.paid)+'・おつり'+yen(t.change):''}</div></div>`).join('')
+    : '<div class="empty">この日の取引はありません</div>';
+  $('txs').querySelectorAll('button[data-id]').forEach(b => b.onclick = () => cancelTx(b.dataset.id));
+}
+async function cancelTx(id){
+  if (!confirm('この取引を取り消しますか？（スプレッドシートには「取消」として残ります）')) return;
+  const q = queue.findIndex(t => t.id === id);
+  if (q >= 0){ queue.splice(q, 1); lsSet(LS.queue, queue); setNet(); renderDay(); return; }
+  try{ await api('cancelTx', { id }); toast('取り消しました'); renderDay(); }
+  catch(e){ toast('電波がないため取り消せませんでした'); }
+}
+$('csv').onclick = () => {
+  if (!dayData.length){ toast('この日の取引はありません'); return; }
+  const rows = [['日付','時刻','品物','単価','数','小計','取引合計','状態']];
+  dayData.slice().reverse().forEach(t => t.lines.forEach(l => rows.push([t.date, t.time, l.name, l.price, l.qty, l.price*l.qty, t.total, t.canceled?'取消':''])));
+  const csv = '\uFEFF' + rows.map(r => r.map(v => '"' + String(v).replace(/"/g,'""') + '"').join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type:'text/csv' }));
+  a.download = 'レジ売上_' + ($('day').value || today()) + '.csv';
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+
+// ---------- はじめ ----------
+async function start(){
+  renderColors(); renderIlist(); renderCart(); setNet();
+  try{
+    const j = await api('getItems');
+    items = j.items; lsSet(LS.items, items); cart = {}; renderIlist(); renderCart();
+  }catch(e){ if (e.code === 'auth') { showLogin(); return; } }
+  flush();
+}
+if (!KEY) { renderColors(); renderCart(); showLogin(); } else start();
+</script>
+</body>
+</html>
