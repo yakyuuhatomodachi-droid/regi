@@ -39,7 +39,7 @@ h2{font-size:16px;margin:0 0 10px}
 
 /* 会計 */
 #kaikei{display:grid;gap:12px}
-@media (min-width:820px){ #kaikei{grid-template-columns:1.4fr 1fr;align-items:start} #cartCard{position:sticky;top:110px} }
+@media (min-width:820px){ #kaikei{grid-template-columns:1.4fr 1fr;align-items:start} .rcol{position:sticky;top:110px} }
 #items{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
 .item{background:#fff;border:2px solid var(--line);border-left:8px solid var(--c,var(--g));padding:14px 10px;text-align:left;min-height:84px;display:flex;flex-direction:column;justify-content:space-between;position:relative}
 .item:active{transform:scale(.97);background:var(--gl)}
@@ -97,6 +97,8 @@ td.r,th.r{text-align:right}
 .cl{padding:10px 0;border-bottom:1px solid var(--line);cursor:pointer}
 .cl .det{display:none;margin-top:8px}
 .cl.open .det{display:block}
+#recent{max-height:320px;overflow:auto}
+#recent .tx:first-child.fresh{background:var(--gl);border-radius:8px;padding-left:8px;padding-right:8px}
 #runTotal{background:var(--gl);color:var(--g);border-radius:10px;padding:8px 12px;font-size:14px;margin-bottom:10px;display:flex;justify-content:space-between}
 #login{position:fixed;inset:0;background:var(--bg);z-index:40;display:none;align-items:center;justify-content:center;padding:16px}
 #login.on{display:flex}
@@ -123,6 +125,7 @@ td.r,th.r{text-align:right}
         <h2>売れた品物を押す <span class="mu">（2個なら2回）</span></h2>
         <div id="items"></div>
       </div>
+      <div class="rcol">
       <div class="card" id="cartCard">
         <div id="runTotal"><span>今回のマルシェの売上</span><b id="runYen">0円（0人）</b></div>
         <h2>お会計</h2>
@@ -141,6 +144,11 @@ td.r,th.r{text-align:right}
           <button class="btn sub" id="clearCart" style="flex:1">やり直す</button>
           <button class="btn" id="record" style="flex:2">会計を記録する</button>
         </div>
+      </div>
+      <div class="card">
+        <h2>記録した会計 <span class="mu">（今回のマルシェ・新しい順）</span></h2>
+        <div id="recent"></div>
+      </div>
       </div>
     </div>
   </section>
@@ -356,7 +364,7 @@ $('record').onclick = () => {
   const lines = Object.entries(cart).filter(([i,q]) => q > 0).map(([i,q]) => ({ name: items[i].name, price: items[i].price, qty: q }));
   const tx = { id: Date.now().toString(36) + Math.random().toString(36).slice(2,6), date: today(), time: nowTime(),
                total, paid: paidValue, change: paidValue === null ? null : paidValue - total, lines };
-  queue.push(tx); lsSet(LS.queue, queue);
+  queue.push(tx); lsSet(LS.queue, queue); freshId = tx.id;
   $('doneSub').textContent = '合計 ' + yen(total) + (paidValue !== null ? '　あずかり ' + yen(paidValue) : '');
   $('doneChange').textContent = paidValue !== null ? 'おつり ' + yen(paidValue - total) : yen(total);
   $('doneBox').classList.add('on');
@@ -418,6 +426,16 @@ function buildOpen(){
   openData = serverOpen.concat(queue.filter(t => !ids.has(t.id)).map(t => Object.assign({ pending: true }, t)))
     .sort((a,b) => (b.date + b.time + b.id).localeCompare(a.date + a.time + a.id));
 }
+function renderTxList(box, list){
+  box.innerHTML = list.length ? list.map(t =>
+    `<div class="tx ${t.canceled?'cx':''}"><div class="row"><b style="flex:1">${esc(t.time)}　<span class="amt">${yen(t.total)}</span>
+      ${t.pending?'<span class="tag">未送信</span>':''}${t.canceled?'<span class="tag gray">取消</span>':''}</b>
+      ${!t.canceled?`<button class="ib" data-id="${esc(t.id)}" style="color:var(--red)">取り消す</button>`:''}</div>
+      <div class="mu">${t.lines.map(l => esc(l.name) + '×' + l.qty).join('、')}${t.paid!=null?'　あずかり'+yen(t.paid)+'・おつり'+yen(t.change):''}</div></div>`).join('')
+    : '<div class="empty">まだ記録した会計はありません</div>';
+  box.querySelectorAll('button[data-id]').forEach(b => b.onclick = () => cancelTx(b.dataset.id));
+}
+let freshId = null;
 function renderOpen(){
   buildOpen();
   const s = aggregate(openData);
@@ -426,13 +444,9 @@ function renderOpen(){
   $('sCount').textContent = s.count + '人';
   $('sQty').textContent = s.qty + '個';
   $('byItem').innerHTML = itemRows(s.items);
-  $('txs').innerHTML = openData.length ? openData.map(t =>
-    `<div class="tx ${t.canceled?'cx':''}"><div class="row"><b style="flex:1">${esc(t.time)}　<span class="amt">${yen(t.total)}</span>
-      ${t.pending?'<span class="tag">未送信</span>':''}${t.canceled?'<span class="tag gray">取消</span>':''}</b>
-      ${!t.canceled?`<button class="ib" data-id="${esc(t.id)}" style="color:var(--red)">取り消す</button>`:''}</div>
-      <div class="mu">${t.lines.map(l => esc(l.name) + '×' + l.qty).join('、')}${t.paid!=null?'　あずかり'+yen(t.paid)+'・おつり'+yen(t.change):''}</div></div>`).join('')
-    : '<div class="empty">まだ取引はありません</div>';
-  $('txs').querySelectorAll('button[data-id]').forEach(b => b.onclick = () => cancelTx(b.dataset.id));
+  renderTxList($('txs'), openData);
+  renderTxList($('recent'), openData);
+  if (freshId && openData[0] && openData[0].id === freshId) $('recent').firstElementChild.classList.add('fresh');
 }
 async function loadOpen(){
   renderOpen();
